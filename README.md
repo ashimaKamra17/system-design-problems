@@ -20,6 +20,10 @@ This repository is dedicated to practicing and demonstrating solutions to variou
 - Each system design problem should be placed in its own folder inside `src/problems/`.
 - Add a README in each problem folder to describe the problem and your approach.
 
+## Problems
+
+- [News Feed (e.g. Facebook)](src/problems/news-feed/README.md): Design and implement a news feed application front end. [Reference](https://www.greatfrontend.com/interviews/study/one-week/questions/system-design/news-feed-facebook)
+
 ## Contributing
 
 - Fork the repo and create a new branch for your problem/solution.

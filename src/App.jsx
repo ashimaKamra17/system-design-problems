@@ -1,21 +1,15 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
+import { Routes, Route } from 'react-router-dom';
+import NewsFeed from './problems/news-feed/NewsFeed';
+import Dashboard from './Dashboard';
 
 function App() {
   return (
     <div className="App">
-      <h1>System Design Problems in React</h1>
-      <p>
-        Welcome! Add your system design problems in <code>src/problems/</code> and they will appear here.
-      </p>
-      <div style={{ marginTop: 32 }}>
-        <h2>Problems</h2>
-        <ul>
-          <li>No problems added yet. Create a folder in <code>src/problems/</code> to get started!</li>
-        </ul>
-      </div>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/news-feed" element={<NewsFeed />} />
+      </Routes>
     </div>
   );
 }
