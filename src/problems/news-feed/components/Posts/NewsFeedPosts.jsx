@@ -1,5 +1,7 @@
 // NewsFeedPosts.jsx
-import React, { useState } from 'react';
+import React from 'react';
+import { useAppDispatch } from '../../../../hooks/redux';
+import { updatePostLikes } from '../../../../store/slices/postsSlice';
 import {
     PostsContainer,
     Post,
@@ -11,125 +13,241 @@ import {
     PostContent,
     PostImage,
     PostActions,
-    ActionButton
+    ActionButton,
+    LoadingPost,
+    PaginationWrapper,
+    PaginationControls,
+    PaginationButton,
+    LoadMoreButton,
+    RefreshButton,
+    PaginationInfo,
+    LoadingIndicator
 } from './newsFeedPosts.style';
 
-const NewsFeedPosts = () => {
-    const [likedPosts, setLikedPosts] = useState(new Set());
-    const [likeCounts, setLikeCounts] = useState({
-        1: 124,
-        2: 89,
-        3: 67,
-        4: 156,
-        5: 203
-    });
+const NewsFeedPosts = ({
+    posts = [],
+    loading = {},
+    pagination = {},
+    onLoadMore,
+    onLoadPrevious,
+    onNavigateNewer,
+    onNavigateOlder,
+    onRefresh
+}) => {
+    const dispatch = useAppDispatch();
 
-    const handleLike = (postId) => {
-        const newLikedPosts = new Set(likedPosts);
-        const newLikeCounts = { ...likeCounts };
+    const handleLike = (post) => {
+        const isCurrentlyLiked = post.isLiked || false;
+        const newLikedState = !isCurrentlyLiked;
+        const newCount = newLikedState ?
+            (post.likes + 1) :
+            Math.max(0, post.likes - 1);
 
-        if (likedPosts.has(postId)) {
-            newLikedPosts.delete(postId);
-            newLikeCounts[postId] = newLikeCounts[postId] - 1;
-        } else {
-            newLikedPosts.add(postId);
-            newLikeCounts[postId] = newLikeCounts[postId] + 1;
-        }
+        // Update Redux state
+        dispatch(updatePostLikes({
+            postId: post.id,
+            liked: newLikedState,
+            newCount: newCount
+        }));
 
-        setLikedPosts(newLikedPosts);
-        setLikeCounts(newLikeCounts);
+        // Here you could also make an API call to persist the like state
+        // apiService.posts.updateLike(post.id, newLikedState);
     };
 
-    const posts = [
-        {
-            id: 1,
-            userName: 'John Doe',
-            time: '2 hours ago',
-            content: 'Just finished an amazing hike in the mountains! The view was absolutely breathtaking. Nature never fails to inspire me. Can\'t wait for the next adventure! 🏔️✨',
-            hasImage: true,
-            imageGradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            comments: 18
-        },
-        {
-            id: 2,
-            userName: 'Tech News Daily',
-            time: '4 hours ago',
-            content: '🚀 Breaking: New AI breakthrough promises to revolutionize how we interact with technology. Researchers have developed a system that can understand context better than ever before. What are your thoughts on the future of AI?',
-            hasImage: false,
-            comments: 42,
-            avatarGradient: 'linear-gradient(45deg, #ff6b6b, #ee5a24)'
-        },
-        {
-            id: 3,
-            userName: 'Food & Travel',
-            time: '6 hours ago',
-            content: 'Discovered this hidden gem of a restaurant today! The pasta was incredible and the atmosphere was so cozy. Sometimes the best places are the ones you stumble upon by accident. 🍝❤️',
-            hasImage: true,
-            imageGradient: 'linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)',
-            avatarGradient: 'linear-gradient(45deg, #4ecdc4, #44a08d)',
-            comments: 23
-        },
-        {
-            id: 4,
-            userName: 'Sarah Chen',
-            time: '8 hours ago',
-            content: 'Working on some exciting new projects! The creative process is so rewarding when everything starts coming together. Collaboration makes everything better 💡✨ #creativity #teamwork',
-            hasImage: true,
-            imageGradient: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-            avatarGradient: 'linear-gradient(45deg, #a8edea, #fed6e3)',
-            comments: 31
-        },
-        {
-            id: 5,
-            userName: 'Daily Inspiration',
-            time: '10 hours ago',
-            content: '"The only way to do great work is to love what you do." - Steve Jobs\n\nStarting this Monday with motivation and positive energy. What\'s inspiring you this week? 🌟',
-            hasImage: false,
-            avatarGradient: 'linear-gradient(45deg, #fdbb2d, #22c1c3)',
-            comments: 87
-        }
-    ];
+    // Loading skeleton for initial load
+    if (loading.fetchPosts && posts.length === 0) {
+        return (
+            <PostsContainer>
+                {[1, 2, 3].map((i) => (
+                    <LoadingPost key={i}>
+                        <PostHeader>
+                            <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                background: '#232b3b'
+                            }} />
+                            <PostInfo>
+                                <div style={{
+                                    width: '120px',
+                                    height: '16px',
+                                    background: '#232b3b',
+                                    borderRadius: '4px'
+                                }} />
+                                <div style={{
+                                    width: '80px',
+                                    height: '12px',
+                                    background: '#232b3b',
+                                    borderRadius: '4px',
+                                    marginTop: '4px'
+                                }} />
+                            </PostInfo>
+                        </PostHeader>
+                        <div style={{
+                            padding: '0 16px 16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                        }}>
+                            <div style={{
+                                width: '100%',
+                                height: '16px',
+                                background: '#232b3b',
+                                borderRadius: '4px'
+                            }} />
+                            <div style={{
+                                width: '80%',
+                                height: '16px',
+                                background: '#232b3b',
+                                borderRadius: '4px'
+                            }} />
+                            <div style={{
+                                width: '60%',
+                                height: '16px',
+                                background: '#232b3b',
+                                borderRadius: '4px'
+                            }} />
+                        </div>
+                    </LoadingPost>
+                ))}
+            </PostsContainer>
+        );
+    }
 
     return (
-        <PostsContainer>
-            {posts.map((post) => (
-                <Post key={post.id}>
-                    <PostHeader>
-                        <PostAvatar gradient={post.avatarGradient || 'linear-gradient(45deg, #667eea, #764ba2)'} />
-                        <PostInfo>
-                            <PostUserName>{post.userName}</PostUserName>
-                            <PostTime>{post.time}</PostTime>
-                        </PostInfo>
-                    </PostHeader>
+        <>
+            {/* Refresh Button - Show when there might be newer posts */}
+            {pagination.hasPrevPage && (
+                <PaginationWrapper>
+                    <RefreshButton onClick={onRefresh}>
+                        🔄 Refresh for newest posts
+                    </RefreshButton>
+                </PaginationWrapper>
+            )}
 
-                    <PostContent>{post.content}</PostContent>
+            <PostsContainer>
+                {/* Loading indicator for previous posts */}
+                {loading.loadPrevious && (
+                    <LoadingIndicator>
+                        Loading newer posts...
+                    </LoadingIndicator>
+                )}
 
-                    {post.hasImage && (
-                        <PostImage gradient={post.imageGradient} />
-                    )}
+                {posts.map((post) => (
+                    <Post key={post.id}>
+                        <PostHeader>
+                            <PostAvatar gradient={post.avatarGradient || 'linear-gradient(45deg, #667eea, #764ba2)'} />
+                            <PostInfo>
+                                <PostUserName>{post.userName}</PostUserName>
+                                <PostTime>{post.time}</PostTime>
+                            </PostInfo>
+                        </PostHeader>
 
-                    <PostActions>
-                        <ActionButton
-                            liked={likedPosts.has(post.id)}
-                            onClick={() => handleLike(post.id)}
-                        >
-                            <span>👍</span>
-                            <span>{likeCounts[post.id]} Like</span>
-                        </ActionButton>
+                        <PostContent
+                            dangerouslySetInnerHTML={{
+                                __html: post.content
+                            }}
+                        />
 
-                        <ActionButton>
-                            <span>💬</span>
-                            <span>{post.comments} Comment</span>
-                        </ActionButton>
+                        {post.hasImage && post.imageGradient && (
+                            <PostImage gradient={post.imageGradient} />
+                        )}
 
-                        <ActionButton>
-                            <span>📤</span>
-                            <span>Share</span>
-                        </ActionButton>
-                    </PostActions>
-                </Post>
-            ))}
-        </PostsContainer>
+                        <PostActions>
+                            <ActionButton
+                                liked={post.isLiked || false}
+                                onClick={() => handleLike(post)}
+                            >
+                                <span>{post.isLiked ? '👍' : '👍'}</span>
+                                <span>{post.likes || 0} Like{post.likes !== 1 ? 's' : ''}</span>
+                            </ActionButton>
+
+                            <ActionButton>
+                                <span>💬</span>
+                                <span>{post.comments || 0} Comment{post.comments !== 1 ? 's' : ''}</span>
+                            </ActionButton>
+
+                            <ActionButton>
+                                <span>📤</span>
+                                <span>Share</span>
+                            </ActionButton>
+                        </PostActions>
+                    </Post>
+                ))}
+
+                {/* Loading indicator for load more */}
+                {loading.loadMore && (
+                    <LoadingIndicator>
+                        Loading more posts...
+                    </LoadingIndicator>
+                )}
+            </PostsContainer>
+
+            {/* Cursor-based Pagination Controls */}
+            <PaginationWrapper>
+                {/* Load More Button (Infinite Scroll Style) */}
+                {pagination.hasNextPage && (
+                    <LoadMoreButton
+                        onClick={onLoadMore}
+                        disabled={loading.loadMore || loading.fetchPosts}
+                        loading={loading.loadMore}
+                    >
+                        {loading.loadMore ? (
+                            <>🔄 Loading...</>
+                        ) : (
+                            <>📄 Load More Posts</>
+                        )}
+                    </LoadMoreButton>
+                )}
+
+                {/* Navigation Controls */}
+                <PaginationControls>
+                    <PaginationButton
+                        onClick={onNavigateNewer}
+                        disabled={!pagination.prevCursor || loading.fetchPosts}
+                    >
+                        ⬆️ Newer Posts
+                    </PaginationButton>
+
+                    <PaginationInfo>
+                        {pagination.totalPosts > 0 && (
+                            <>
+                                Showing {posts.length} posts
+                                <br />
+                                <small>{pagination.totalPosts} total posts</small>
+                            </>
+                        )}
+                    </PaginationInfo>
+
+                    <PaginationButton
+                        onClick={onNavigateOlder}
+                        disabled={!pagination.nextCursor || loading.fetchPosts}
+                    >
+                        ⬇️ Older Posts
+                    </PaginationButton>
+                </PaginationControls>
+
+                {/* Debug Info (Remove in production) */}
+                {process.env.NODE_ENV === 'development' && (
+                    <div style={{
+                        padding: '12px',
+                        background: '#1a2332',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        color: '#7a869a',
+                        fontFamily: 'monospace'
+                    }}>
+                        <strong>Debug Info:</strong><br />
+                        Next Cursor: {pagination.nextCursor || 'null'}<br />
+                        Prev Cursor: {pagination.prevCursor || 'null'}<br />
+                        Has Next: {pagination.hasNextPage ? 'yes' : 'no'}<br />
+                        Has Prev: {pagination.hasPrevPage ? 'yes' : 'no'}<br />
+                        Direction: {pagination.direction || 'next'}
+                    </div>
+                )}
+            </PaginationWrapper>
+        </>
     );
 };
 

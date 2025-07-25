@@ -336,3 +336,88 @@ const shimmer = keyframes`
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 `;
+
+// Pagination Controls
+export const PaginationWrapper = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-top: 30px;
+  padding: 20px;
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
+
+  @media (max-width: 768px) {
+    gap: 15px;
+    padding: 15px 10px;
+  }
+`;
+
+export const PaginationButton = styled.button`
+  padding: 12px 20px;
+  border: 1px solid #232b3b;
+  border-radius: 8px;
+  background: #151a28;
+  color: #e0e6ed;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+
+  &:hover:not(:disabled) {
+    background: #232b3b;
+    border-color: #7ab8ff;
+    color: #7ab8ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(122, 184, 255, 0.15);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(122, 184, 255, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #151a28;
+    border-color: #232b3b;
+    color: #7a869a;
+  }
+
+  &:focus {
+    outline: 2px solid #7ab8ff;
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 768px) {
+    padding: 10px 16px;
+    font-size: 13px;
+    min-width: 80px;
+  }
+`;
+
+export const PaginationInfo = styled.div`
+  text-align: center;
+  color: #e0e6ed;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  small {
+    font-size: 12px;
+    color: #7a869a;
+    font-weight: normal;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+    
+    small {
+      font-size: 11px;
+    }
+  }
+`;
