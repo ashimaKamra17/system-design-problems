@@ -115,6 +115,47 @@ export const apiService = {
         throw new Error("Failed to create post");
       }
     },
+
+    // Like/Unlike a post
+    toggleLike: async (postId, isLiked) => {
+      try {
+        const response = await api.post(`/posts/${postId}/like`, { isLiked });
+        return response.data;
+      } catch (error) {
+        if (error.response?.status === 404) {
+          throw new Error("Post not found");
+        } else if (error.response?.status === 500) {
+          throw new Error(
+            error.response.data.message || "Like operation failed"
+          );
+        }
+        throw new Error("Failed to update like status");
+      }
+    },
+
+    // Add comment to a post
+    addComment: async (postId, commentData) => {
+      try {
+        const response = await api.post(
+          `/posts/${postId}/comment`,
+          commentData
+        );
+        return response.data;
+      } catch (error) {
+        if (error.response?.status === 404) {
+          throw new Error("Post not found");
+        } else if (error.response?.status === 400) {
+          throw new Error(
+            error.response.data.message || "Invalid comment data"
+          );
+        } else if (error.response?.status === 500) {
+          throw new Error(
+            error.response.data.message || "Comment operation failed"
+          );
+        }
+        throw new Error("Failed to add comment");
+      }
+    },
   },
 };
 

@@ -19,6 +19,7 @@ let posts = [
     likes: 124,
     comments: 18,
     shares: 5,
+    isLiked: false,
   },
   {
     id: "post-2",
@@ -34,6 +35,7 @@ let posts = [
     likes: 89,
     comments: 42,
     shares: 12,
+    isLiked: false,
   },
   {
     id: "post-3",
@@ -49,6 +51,7 @@ let posts = [
     likes: 67,
     comments: 23,
     shares: 8,
+    isLiked: false,
   },
   {
     id: "post-4",
@@ -64,6 +67,7 @@ let posts = [
     likes: 156,
     comments: 31,
     shares: 15,
+    isLiked: false,
   },
   {
     id: "post-5",
@@ -79,6 +83,7 @@ let posts = [
     likes: 203,
     comments: 87,
     shares: 25,
+    isLiked: false,
   },
 ];
 
@@ -222,6 +227,7 @@ router.post("/", (req, res) => {
       likes: 0,
       comments: 0,
       shares: 0,
+      isLiked: false,
     };
 
     // Add to beginning of posts array (newest first)
@@ -241,6 +247,112 @@ router.post("/", (req, res) => {
   } catch (error) {
     console.error("Error creating post:", error);
     res.status(500).json({ error: "Failed to create post" });
+  }
+});
+
+// POST /api/posts/:id/like - Toggle like on a post
+router.post("/:id/like", (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isLiked } = req.body; // true to like, false to unlike
+
+    const post = posts.find((p) => p.id === id);
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    // Simulate network delay for testing optimistic updates
+    const simulateDelay = Math.random() < 0.1; // 10% chance of delay
+    const simulateError = Math.random() < 0.05; // 5% chance of error
+
+    if (simulateError) {
+      return res.status(500).json({
+        error: "Like operation failed",
+        message: "Something went wrong. Please try again.",
+      });
+    }
+
+    const delay = simulateDelay ? 2000 : Math.random() * 500; // 0-500ms or 2s delay
+
+    setTimeout(() => {
+      // Update the post
+      if (isLiked && !post.isLiked) {
+        post.likes += 1;
+        post.isLiked = true;
+      } else if (!isLiked && post.isLiked) {
+        post.likes = Math.max(0, post.likes - 1);
+        post.isLiked = false;
+      }
+
+      res.json({
+        success: true,
+        postId: id,
+        likes: post.likes,
+        isLiked: post.isLiked,
+        message: isLiked ? "Post liked" : "Post unliked",
+      });
+    }, delay);
+  } catch (error) {
+    console.error("Error updating like:", error);
+    res.status(500).json({ error: "Failed to update like" });
+  }
+});
+
+// POST /api/posts/:id/comment - Add a comment to a post
+router.post("/:id/comment", (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content, userName } = req.body;
+
+    const post = posts.find((p) => p.id === id);
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    if (!content || !userName) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        message: "content and userName are required",
+      });
+    }
+
+    // Simulate network delay and potential errors
+    const simulateDelay = Math.random() < 0.15; // 15% chance of delay
+    const simulateError = Math.random() < 0.03; // 3% chance of error
+
+    if (simulateError) {
+      return res.status(500).json({
+        error: "Comment operation failed",
+        message: "Failed to post comment. Please try again.",
+      });
+    }
+
+    const delay = simulateDelay ? 1500 : Math.random() * 300; // 0-300ms or 1.5s delay
+
+    setTimeout(() => {
+      // Create comment
+      const comment = {
+        id: uuidv4(),
+        content: content.trim(),
+        userName: userName.trim(),
+        createdAt: new Date().toISOString(),
+        time: "Just now",
+      };
+
+      // Update post comment count
+      post.comments += 1;
+
+      res.status(201).json({
+        success: true,
+        postId: id,
+        comment,
+        totalComments: post.comments,
+        message: "Comment added successfully",
+      });
+    }, delay);
+  } catch (error) {
+    console.error("Error adding comment:", error);
+    res.status(500).json({ error: "Failed to add comment" });
   }
 });
 

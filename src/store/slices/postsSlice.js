@@ -81,10 +81,118 @@ export const fetchPostById = createAsyncThunk(
   }
 );
 
+// Optimistic update thunks
+export const togglePostLike = createAsyncThunk(
+  "posts/togglePostLike",
+  async (
+    { postId, isCurrentlyLiked },
+    { dispatch, rejectWithValue, getState }
+  ) => {
+    const newLikedState = !isCurrentlyLiked;
+
+    // Optimistically update the UI immediately
+    dispatch(
+      updatePostLikes({
+        postId,
+        liked: newLikedState,
+        newCount: newLikedState
+          ? (getState().posts.posts.find((p) => p.id === postId)?.likes || 0) +
+            1
+          : Math.max(
+              0,
+              (getState().posts.posts.find((p) => p.id === postId)?.likes ||
+                0) - 1
+            ),
+      })
+    );
+
+    try {
+      // Make the actual API call
+      const response = await apiService.posts.toggleLike(postId, newLikedState);
+
+      // Update with server response (in case counts differ)
+      return {
+        postId,
+        likes: response.likes,
+        isLiked: response.isLiked,
+        optimistic: false,
+      };
+    } catch (error) {
+      // Rollback the optimistic update on failure
+      dispatch(
+        updatePostLikes({
+          postId,
+          liked: isCurrentlyLiked, // Revert to original state
+          newCount:
+            getState().posts.posts.find((p) => p.id === postId)?.likes || 0,
+        })
+      );
+
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const addPostComment = createAsyncThunk(
+  "posts/addPostComment",
+  async (
+    { postId, content, userName },
+    { dispatch, rejectWithValue, getState }
+  ) => {
+    // Generate optimistic comment
+    const optimisticComment = {
+      id: `temp-${Date.now()}`,
+      content,
+      userName,
+      createdAt: new Date().toISOString(),
+      time: "Just now",
+      isOptimistic: true,
+    };
+
+    // Optimistically update the UI immediately
+    dispatch(
+      updatePostComments({
+        postId,
+        newCount:
+          (getState().posts.posts.find((p) => p.id === postId)?.comments || 0) +
+          1,
+        optimisticComment,
+      })
+    );
+
+    try {
+      // Make the actual API call
+      const response = await apiService.posts.addComment(postId, {
+        content,
+        userName,
+      });
+
+      // Replace optimistic comment with real one
+      return {
+        postId,
+        realComment: response.comment,
+        totalComments: response.totalComments,
+        optimisticCommentId: optimisticComment.id,
+      };
+    } catch (error) {
+      // Rollback the optimistic update on failure
+      dispatch(
+        removeOptimisticComment({
+          postId,
+          optimisticCommentId: optimisticComment.id,
+        })
+      );
+
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   posts: [],
   currentPost: null,
+  optimisticUpdates: {}, // Track ongoing optimistic updates
   pagination: {
     hasNextPage: false,
     hasPrevPage: false,
@@ -101,6 +209,8 @@ const initialState = {
     refresh: false,
     createPost: false,
     fetchPost: false,
+    like: {}, // Track loading states per post: { [postId]: boolean }
+    comment: {}, // Track loading states per post: { [postId]: boolean }
   },
   error: {
     fetchPosts: null,
@@ -109,6 +219,8 @@ const initialState = {
     refresh: null,
     createPost: null,
     fetchPost: null,
+    like: {}, // Track errors per post: { [postId]: string }
+    comment: {}, // Track errors per post: { [postId]: string }
   },
 };
 
@@ -126,6 +238,8 @@ const postsSlice = createSlice({
         refresh: null,
         createPost: null,
         fetchPost: null,
+        like: {},
+        comment: {},
       };
     },
     clearCurrentPost: (state) => {
@@ -139,9 +253,44 @@ const postsSlice = createSlice({
         post.isLiked = liked;
       }
     },
+    updatePostComments: (state, action) => {
+      const { postId, newCount, optimisticComment } = action.payload;
+      const post = state.posts.find((p) => p.id === postId);
+      if (post) {
+        post.comments = newCount;
+        // Store optimistic comment for potential rollback
+        if (optimisticComment) {
+          state.optimisticUpdates[postId] =
+            state.optimisticUpdates[postId] || {};
+          state.optimisticUpdates[postId].comments =
+            state.optimisticUpdates[postId].comments || [];
+          state.optimisticUpdates[postId].comments.push(optimisticComment);
+        }
+      }
+    },
+    removeOptimisticComment: (state, action) => {
+      const { postId, optimisticCommentId } = action.payload;
+      const post = state.posts.find((p) => p.id === postId);
+      if (post) {
+        post.comments = Math.max(0, post.comments - 1);
+        // Remove optimistic comment from tracking
+        if (state.optimisticUpdates[postId]?.comments) {
+          state.optimisticUpdates[postId].comments = state.optimisticUpdates[
+            postId
+          ].comments.filter((c) => c.id !== optimisticCommentId);
+        }
+      }
+    },
+    clearPostError: (state, action) => {
+      const { postId, type } = action.payload; // type: 'like' or 'comment'
+      if (state.error[type] && state.error[type][postId]) {
+        delete state.error[type][postId];
+      }
+    },
     resetPosts: (state) => {
       state.posts = [];
       state.pagination = initialState.pagination;
+      state.optimisticUpdates = {};
     },
   },
   extraReducers: (builder) => {
@@ -246,6 +395,64 @@ const postsSlice = createSlice({
         state.error.createPost = action.payload;
       });
 
+    // Optimistic like toggle
+    builder
+      .addCase(togglePostLike.pending, (state, action) => {
+        const { postId } = action.meta.arg;
+        state.loading.like[postId] = true;
+        state.error.like[postId] = null;
+      })
+      .addCase(togglePostLike.fulfilled, (state, action) => {
+        const { postId, likes, isLiked } = action.payload;
+        state.loading.like[postId] = false;
+
+        // Update with server response (reconcile any differences)
+        const post = state.posts.find((p) => p.id === postId);
+        if (post) {
+          post.likes = likes;
+          post.isLiked = isLiked;
+        }
+
+        state.error.like[postId] = null;
+      })
+      .addCase(togglePostLike.rejected, (state, action) => {
+        const { postId } = action.meta.arg;
+        state.loading.like[postId] = false;
+        state.error.like[postId] = action.payload;
+      });
+
+    // Optimistic comment add
+    builder
+      .addCase(addPostComment.pending, (state, action) => {
+        const { postId } = action.meta.arg;
+        state.loading.comment[postId] = true;
+        state.error.comment[postId] = null;
+      })
+      .addCase(addPostComment.fulfilled, (state, action) => {
+        const { postId, totalComments, optimisticCommentId } = action.payload;
+        state.loading.comment[postId] = false;
+
+        // Update comment count with server response
+        const post = state.posts.find((p) => p.id === postId);
+        if (post) {
+          post.comments = totalComments;
+        }
+
+        // Remove optimistic comment from tracking (it's now real)
+        if (state.optimisticUpdates[postId]?.comments) {
+          state.optimisticUpdates[postId].comments = state.optimisticUpdates[
+            postId
+          ].comments.filter((c) => c.id !== optimisticCommentId);
+        }
+
+        state.error.comment[postId] = null;
+      })
+      .addCase(addPostComment.rejected, (state, action) => {
+        const { postId } = action.meta.arg;
+        state.loading.comment[postId] = false;
+        state.error.comment[postId] = action.payload;
+      });
+
     // Fetch single post
     builder
       .addCase(fetchPostById.pending, (state) => {
@@ -265,8 +472,15 @@ const postsSlice = createSlice({
 });
 
 // Export actions
-export const { clearErrors, clearCurrentPost, updatePostLikes, resetPosts } =
-  postsSlice.actions;
+export const {
+  clearErrors,
+  clearCurrentPost,
+  updatePostLikes,
+  updatePostComments,
+  removeOptimisticComment,
+  clearPostError,
+  resetPosts,
+} = postsSlice.actions;
 
 // Selectors
 export const selectPosts = (state) => state.posts.posts;
@@ -284,5 +498,15 @@ export const selectPostsError = (state) => state.posts.error.fetchPosts;
 export const selectLoadMoreError = (state) => state.posts.error.loadMore;
 export const selectCreatePostError = (state) => state.posts.error.createPost;
 export const selectFetchPostError = (state) => state.posts.error.fetchPost;
+
+// Optimistic update selectors
+export const selectPostLikeLoading = (state, postId) =>
+  state.posts.loading.like[postId] || false;
+export const selectPostCommentLoading = (state, postId) =>
+  state.posts.loading.comment[postId] || false;
+export const selectPostLikeError = (state, postId) =>
+  state.posts.error.like[postId] || null;
+export const selectPostCommentError = (state, postId) =>
+  state.posts.error.comment[postId] || null;
 
 export default postsSlice.reducer;
